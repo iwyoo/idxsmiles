@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "idxsmiles"
+version = "0.1.0"
+description = "RDKit SMILES writer that orders atoms by their original atom index instead of canonical rank"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+dependencies = [
+    "rdkit",
+]
+
+[tool.setuptools]
+py-modules = ["idxsmiles"]
