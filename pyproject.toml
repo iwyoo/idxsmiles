@@ -14,4 +14,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-py-modules = ["idxsmiles"]
+packages = ["idxsmiles"]
+
+[tool.setuptools.package-data]
+idxsmiles = ["py.typed"]
