@@ -1,5 +1,9 @@
 # idxsmiles
 
+[![PyPI](https://img.shields.io/pypi/v/idxsmiles.svg)](https://pypi.org/project/idxsmiles/)
+[![CI](https://github.com/iwyoo/idxsmiles/actions/workflows/ci.yml/badge.svg)](https://github.com/iwyoo/idxsmiles/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 An RDKit SMILES writer that orders atoms by their **original atom index**
 instead of RDKit's canonical rank — deterministic, human-aligned output,
 with stereochemistry preserved.
@@ -26,6 +30,12 @@ disabled from Python, this library implements its own DFS-based SMILES
 writer: atoms are always visited in strict ascending atom-index order, with
 no exceptions for ring bonds — while still producing valid, stereo-correct
 SMILES that RDKit can re-parse into the identical structure.
+
+## Installation
+
+```bash
+pip install idxsmiles
+```
 
 ## Usage
 
