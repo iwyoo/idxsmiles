@@ -31,13 +31,13 @@ SMILES that RDKit can re-parse into the identical structure.
 
 ```python
 from rdkit import Chem
-from idxsmiles import mol_to_idx_ordered_smiles
+from idxsmiles import mol_to_smiles
 
 mol = Chem.MolFromSmiles("CC(=O)Oc1ccccc1C(=O)O")
-smiles = mol_to_idx_ordered_smiles(mol)
+smiles = mol_to_smiles(mol)
 ```
 
-`mol_to_idx_ordered_smiles(mol: Chem.Mol) -> str` takes an RDKit `Mol` and
+`mol_to_smiles(mol: Chem.Mol) -> str` takes an RDKit `Mol` and
 returns a SMILES string whose atom order follows the input `Mol`'s atom
 indices as closely as the molecular graph allows (ring/branch structure
 still constrains what's possible — the result is not necessarily perfectly
