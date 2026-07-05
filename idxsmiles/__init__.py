@@ -39,14 +39,17 @@ trigonal bipyramidal, octahedral) and cumulated/shared stereo double bonds
 are out of scope and raise NotImplementedError.
 """
 
+from __future__ import annotations
+
 import heapq
+from typing import Sequence
 
 from rdkit import Chem
 
 _FLIP_DIR = {"/": "\\", "\\": "/"}
 
 
-def _count_swaps(probe, ref):
+def _count_swaps(probe: Sequence[int], ref: Sequence[int]) -> int:
     """Parity (# of transpositions) needed to turn `probe` into `ref`'s
     order. Mirrors RDKit's Atom::getPerturbationOrder."""
     order = [ref.index(x) for x in probe]
@@ -59,15 +62,17 @@ def _count_swaps(probe, ref):
     return swaps
 
 
-def _atom_has_fourth_valence(atom):
+def _atom_has_fourth_valence(atom: Chem.Atom) -> bool:
     return atom.GetNumExplicitHs() == 1 or atom.GetImplicitValence() == 1
 
 
-def _atom_is_unsaturated(atom):
+def _atom_is_unsaturated(atom: Chem.Atom) -> bool:
     return any(b.GetBondTypeAsDouble() > 1 for b in atom.GetBonds())
 
 
-def _chiral_needs_tag_inversion(atom, is_atom_first, num_closures):
+def _chiral_needs_tag_inversion(
+    atom: Chem.Atom, is_atom_first: bool, num_closures: int
+) -> bool:
     """Port of Canon::chiralAtomNeedsTagInversion: accounts for the implicit
     H of a 3-explicit-neighbor chiral atom being written as [C@H] instead of
     RDKit's internal 'H is the last neighbor' convention."""
@@ -79,10 +84,10 @@ def _chiral_needs_tag_inversion(atom, is_atom_first, num_closures):
             not _atom_is_unsaturated(atom))
 
 
-_two_neighbor_swap_flips_chirality_cached = None
+_two_neighbor_swap_flips_chirality_cached: bool | None = None
 
 
-def _two_neighbor_swap_flips_chirality():
+def _two_neighbor_swap_flips_chirality() -> bool:
     """Whether the installed RDKit treats the two real neighbors of a
     2-real-neighbor (lone-pair) stereocentre with an explicit/implicit H
     (e.g. a chiral [P@H] or [S@H]) as order-sensitive for @/@@ meaning.
@@ -106,7 +111,7 @@ def _two_neighbor_swap_flips_chirality():
     return _two_neighbor_swap_flips_chirality_cached
 
 
-def _permutes_real_bonds_for_chirality(atom):
+def _permutes_real_bonds_for_chirality(atom: Chem.Atom) -> bool:
     """Whether reordering this chiral atom's 2 real bonds (relative to
     their native Atom::getBonds() order) should flip its @/@@ tag.
 
@@ -147,7 +152,7 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
     parent_atom = [-1] * n
     parent_bond = [-1] * n
     visit_order = [-1] * n
-    children = [[] for _ in range(n)]
+    children: list[list[int]] = [[] for _ in range(n)]
     order_counter = 0
     fragment_roots = []
 
@@ -183,7 +188,7 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
                  if bond.GetIdx() not in tree_bonds]
 
     # ---- pass 2: ring-closure digit assignment -----------------------
-    def endpoints_in_visit_order(bond_idx):
+    def endpoints_in_visit_order(bond_idx: int) -> tuple[int, int]:
         bond = work.GetBondWithIdx(bond_idx)
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         return (a, b) if visit_order[a] < visit_order[b] else (b, a)
@@ -197,9 +202,9 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
         events.append((visit_order[closer], 1, bidx))
     events.sort(key=lambda e: (e[0], e[1]))
 
-    free_digits = []
+    free_digits: list[int] = []
     next_digit = 1
-    digit_of_bond = {}
+    digit_of_bond: dict[int, int] = {}
     for _, kind, bidx in events:
         if kind == 0:
             d = heapq.heappop(free_digits) if free_digits else next_digit
@@ -209,15 +214,15 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
         else:
             heapq.heappush(free_digits, digit_of_bond[bidx])
 
-    opens_at = {a: [] for a in range(n)}
-    closes_at = {a: [] for a in range(n)}
+    opens_at: dict[int, list[int]] = {a: [] for a in range(n)}
+    closes_at: dict[int, list[int]] = {a: [] for a in range(n)}
     for bidx, (opener, closer) in ring_open_close.items():
         opens_at[opener].append(bidx)
         closes_at[closer].append(bidx)
     for lst in list(opens_at.values()) + list(closes_at.values()):
         lst.sort()
 
-    def ring_digit_text(digit):
+    def ring_digit_text(digit: int) -> str:
         if digit < 10:
             return str(digit)
         if digit < 100:
@@ -265,7 +270,7 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
     # 3b. double-bond cis/trans: for each stereo double bond, pick one
     # flanking (non-double) bond per side and compute the '/'/'\\'
     # character to emit for it, given *our* traversal order.
-    stereo_bond_char = {}
+    stereo_bond_char: dict[int, str] = {}
     for bond in work.GetBonds():
         if (bond.GetBondType() != Chem.BondType.DOUBLE or
                 bond.GetStereo() in (Chem.BondStereo.STEREONONE,
@@ -286,7 +291,7 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
         same_side = bond.GetStereo() in (Chem.BondStereo.STEREOZ,
                                          Chem.BondStereo.STEREOCIS)
 
-        def pick_flanking_bond(sp2_idx, other_sp2_idx):
+        def pick_flanking_bond(sp2_idx: int, other_sp2_idx: int) -> int | None:
             candidates = []
             if parent_atom[sp2_idx] >= 0 and parent_atom[sp2_idx] != other_sp2_idx:
                 candidates.append(parent_bond[sp2_idx])
@@ -310,7 +315,9 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
         # matches Canon::canonicalizeDoubleBond's isFirstFromAtom1/2Flipped):
         # on the a1 (first-visited) side we ask "is a1 before its anchor?";
         # on the a2 (second-visited) side we ask "is the anchor before a2?".
-        def anchor_and_flip(sp2_idx, flank_bond_idx, sp2_first):
+        def anchor_and_flip(
+            sp2_idx: int, flank_bond_idx: int, sp2_first: bool
+        ) -> tuple[int, bool]:
             b = work.GetBondWithIdx(flank_bond_idx)
             anchor = b.GetOtherAtomIdx(sp2_idx)
             is_ring = flank_bond_idx in ring_open_close
@@ -350,24 +357,26 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
     # ---- pass 4: text emission -----------------------------------------
     out = []
 
-    def bond_text(bond_idx, from_idx):
+    def bond_text(bond_idx: int, from_idx: int) -> str:
         # Bond.GetSmarts() always renders a DATIVE bond as "->" (it assumes
         # the bond's own begin atom is to the left); flip it if we are
         # actually writing the bond starting from the end atom.
         bond = work.GetBondWithIdx(bond_idx)
-        text = bond.GetSmarts()
+        # mypy misreads Bond.GetSmarts's signature from RDKit's unstubbed
+        # Boost.Python binding as requiring an explicit `bond` argument.
+        text = bond.GetSmarts()  # type: ignore[call-arg]
         if (bond.GetBondType() == Chem.BondType.DATIVE and
                 from_idx != bond.GetBeginAtomIdx()):
             text = "<-" if text == "->" else "->"
         return text
 
-    def emit_bond(bond_idx, from_idx):
+    def emit_bond(bond_idx: int, from_idx: int) -> None:
         if bond_idx in stereo_bond_char:
             out.append(stereo_bond_char[bond_idx])
         else:
             out.append(bond_text(bond_idx, from_idx))
 
-    def emit_atom(idx):
+    def emit_atom(idx: int) -> None:
         out.append(work.GetAtomWithIdx(idx).GetSmarts())
         for bidx in opens_at[idx] + closes_at[idx]:
             if bidx in stereo_bond_char:
