@@ -121,6 +121,26 @@ def test_ring_bond_bias_is_avoided():
     assert _canon(reparsed) == _canon(mol)
 
 
+def test_two_neighbor_chiral_center_swap_is_handled():
+    """Regression test for a 2-real-neighbor (lone-pair) chiral centre
+    (e.g. [P@H]) whose real-neighbor write order needs to be checked
+    against RDKit's own convention rather than assumed irrelevant --
+    RDKit's convention for this specific atom pattern differs across
+    versions (see _two_neighbor_swap_flips_chirality in idxsmiles.py),
+    and this permutation reliably exposed the wrong convention on RDKit
+    2026.3.x before the fix (independent of hash-seed randomization, which
+    otherwise makes CURATED_SMILES's random-shuffle tests flaky in terms
+    of exactly which permutation gets tried)."""
+    mol = Chem.MolFromSmiles("C[P@H]CC(=O)O")
+    canon0 = _canon(mol)
+    order = [1, 2, 0, 3, 4, 5]
+    mol2 = Chem.RenumberAtoms(mol, order)
+    out = mol_to_smiles(mol2)
+    reparsed = Chem.MolFromSmiles(out)
+    assert reparsed is not None
+    assert _canon(reparsed) == canon0
+
+
 @pytest.mark.parametrize("smi", CURATED_SMILES)
 def test_atoms_are_written_in_ascending_index_order(smi):
     """Verifies the *ranking* itself, not just structural round-trip.

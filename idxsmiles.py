@@ -79,21 +79,46 @@ def _chiral_needs_tag_inversion(atom, is_atom_first, num_closures):
             not _atom_is_unsaturated(atom))
 
 
+_two_neighbor_swap_flips_chirality_cached = None
+
+
+def _two_neighbor_swap_flips_chirality():
+    """Whether the installed RDKit treats the two real neighbors of a
+    2-real-neighbor (lone-pair) stereocentre with an explicit/implicit H
+    (e.g. a chiral [P@H] or [S@H]) as order-sensitive for @/@@ meaning.
+
+    This is not a fixed RDKit convention: verified empirically that RDKit
+    <= 2025.9.x parses '[P@H](C)CC(=O)O' and '[P@H](CC(=O)O)C' (same
+    stereocentre, real neighbors listed in opposite order) as the *same*
+    chirality, while RDKit >= 2026.3.x parses them as *opposite* -- a
+    behavior change in RDKit's own SMILES handling of this atom pattern,
+    not a bug in this module's traversal. Rather than hardcode either
+    answer (and silently produce wrong output on whichever RDKit version
+    guessed wrong), detect the installed RDKit's actual behavior once
+    against this reference molecule and cache the result.
+    """
+    global _two_neighbor_swap_flips_chirality_cached
+    if _two_neighbor_swap_flips_chirality_cached is None:
+        neighbors_first = Chem.MolToSmiles(Chem.MolFromSmiles("[P@H](C)CC(=O)O"))
+        neighbors_swapped = Chem.MolToSmiles(Chem.MolFromSmiles("[P@H](CC(=O)O)C"))
+        _two_neighbor_swap_flips_chirality_cached = (
+            neighbors_first != neighbors_swapped)
+    return _two_neighbor_swap_flips_chirality_cached
+
+
 def _permutes_real_bonds_for_chirality(atom):
     """Whether reordering this chiral atom's 2 real bonds (relative to
     their native Atom::getBonds() order) should flip its @/@@ tag.
 
     True for the common case (3 or 4 real neighbors, chirality defined
     directly by their listed order, matching Canon::canonicalizeFragment's
-    getPerturbationOrder). False for a 2-real-neighbor stereocentre with an
-    explicit/implicit H (e.g. a chiral [P@H] or [S@H]): empirically (tested
-    against RDKit's own canonical round-trip across thousands of random
-    atom-index permutations, see idxsmiles test suite), which of the
-    two real neighbors is written first never changes the meaning of the
-    tag, at the root or not -- only the identity of the two neighbors
-    matters, not their order.
+    getPerturbationOrder). For a 2-real-neighbor stereocentre with an
+    explicit/implicit H, deferred to the installed RDKit's own observed
+    convention -- see _two_neighbor_swap_flips_chirality.
     """
-    return atom.GetDegree() != 2 or not _atom_has_fourth_valence(atom)
+    if atom.GetDegree() != 2 or not _atom_has_fourth_valence(atom):
+        return True
+    return _two_neighbor_swap_flips_chirality()
 
 
 def mol_to_smiles(mol: Chem.Mol) -> str:
