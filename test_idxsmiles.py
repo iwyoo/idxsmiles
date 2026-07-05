@@ -1,4 +1,4 @@
-"""Tests for idxsmiles.mol_to_idx_ordered_smiles.
+"""Tests for idxsmiles.mol_to_smiles.
 
 Covers:
   - round-trip structure preservation under random atom renumbering
@@ -22,7 +22,7 @@ import random
 import pytest
 from rdkit import Chem
 
-from idxsmiles import mol_to_idx_ordered_smiles
+from idxsmiles import mol_to_smiles
 
 
 def _canon(mol):
@@ -101,7 +101,7 @@ def test_roundtrip_under_random_renumbering(smi, seed):
     rng.shuffle(order)
     mol2 = Chem.RenumberAtoms(mol, order)
 
-    out = mol_to_idx_ordered_smiles(mol2)
+    out = mol_to_smiles(mol2)
     reparsed = Chem.MolFromSmiles(out)
     assert reparsed is not None, "writer produced unparsable SMILES: %r" % out
     assert _canon(reparsed) == canon0
@@ -115,7 +115,7 @@ def test_ring_bond_bias_is_avoided():
     mol = Chem.MolFromSmiles("C1=CC(C)C1")
     order = [0, 1, 2, 4, 3]  # ring-closure atom -> idx 3, methyl branch -> idx 4
     mol2 = Chem.RenumberAtoms(mol, order)
-    out = mol_to_idx_ordered_smiles(mol2)
+    out = mol_to_smiles(mol2)
     reparsed = Chem.MolFromSmiles(out)
     assert reparsed is not None
     assert _canon(reparsed) == _canon(mol)
@@ -138,7 +138,7 @@ def test_atoms_are_written_in_ascending_index_order(smi):
         atom.SetAtomMapNum(atom.GetIdx() + 1)
     expected = _greedy_ascending_dfs_order(mol)
 
-    out = mol_to_idx_ordered_smiles(mol)
+    out = mol_to_smiles(mol)
     reparsed = Chem.MolFromSmiles(out, sanitize=False)
     assert reparsed is not None
     written_order = [a.GetAtomMapNum() - 1 for a in reparsed.GetAtoms()]
@@ -155,8 +155,8 @@ def test_shared_stereo_double_bond_raises():
     order = [11, 9, 0, 16, 2, 15, 10, 3, 5, 17, 14, 6, 7, 8, 4, 1, 13, 12]
     mol2 = Chem.RenumberAtoms(mol, order)
     with pytest.raises(NotImplementedError):
-        mol_to_idx_ordered_smiles(mol2)
+        mol_to_smiles(mol2)
 
 
 def test_empty_mol():
-    assert mol_to_idx_ordered_smiles(Chem.Mol()) == ""
+    assert mol_to_smiles(Chem.Mol()) == ""

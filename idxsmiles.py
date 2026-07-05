@@ -96,7 +96,7 @@ def _permutes_real_bonds_for_chirality(atom):
     return atom.GetDegree() != 2 or not _atom_has_fourth_valence(atom)
 
 
-def mol_to_idx_ordered_smiles(mol: Chem.Mol) -> str:
+def mol_to_smiles(mol: Chem.Mol) -> str:
     """Serialize `mol` to SMILES, visiting atoms in ascending atom-index
     order at every branch point (instead of RDKit's canonical or
     ring-biased non-canonical order). Re-parsing the result reproduces the
