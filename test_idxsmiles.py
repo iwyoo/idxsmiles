@@ -17,6 +17,7 @@ Covers:
 
 Run with: pytest test_idxsmiles.py
 """
+import hashlib
 import random
 
 import pytest
@@ -96,7 +97,8 @@ def test_roundtrip_under_random_renumbering(smi, seed):
     assert mol is not None
     canon0 = _canon(mol)
     n = mol.GetNumAtoms()
-    rng = random.Random(hash((smi, seed)))
+    stable_hash = hashlib.sha256(f"{smi}-{seed}".encode()).hexdigest()
+    rng = random.Random(stable_hash)
     order = list(range(n))
     rng.shuffle(order)
     mol2 = Chem.RenumberAtoms(mol, order)
