@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idxsmiles"
-version = "0.1.1"
+version = "0.2.0"
 description = "RDKit SMILES writer that orders atoms by their original atom index instead of canonical rank"
 readme = "README.md"
 license = { text = "MIT" }
