@@ -126,6 +126,64 @@ def _permutes_real_bonds_for_chirality(atom: Chem.Atom) -> bool:
     return _two_neighbor_swap_flips_chirality()
 
 
+def _build_dfs_forest(
+    mol: Chem.Mol,
+) -> tuple[list[int], list[int], list[int], list[list[int]], list[int]]:
+    """Ascending-atom-index-ordered DFS spanning forest of `mol`: at every
+    branch point, the lowest-index unvisited neighbor is visited next, with
+    no exceptions for ring bonds (see module docstring).
+
+    Returns (visit_order, parent_atom, parent_bond, children, fragment_roots)
+    where visit_order[i] is atom i's 0-based rank in this traversal."""
+    n = mol.GetNumAtoms()
+    neighbors = [sorted(a.GetIdx() for a in atom.GetNeighbors())
+                for atom in mol.GetAtoms()]
+
+    visited = [False] * n
+    parent_atom = [-1] * n
+    parent_bond = [-1] * n
+    visit_order = [-1] * n
+    children: list[list[int]] = [[] for _ in range(n)]
+    order_counter = 0
+    fragment_roots = []
+
+    for start in range(n):
+        if visited[start]:
+            continue
+        fragment_roots.append(start)
+        visited[start] = True
+        visit_order[start] = order_counter
+        order_counter += 1
+        stack = [(start, iter(neighbors[start]))]
+        while stack:
+            u, it = stack[-1]
+            advanced = False
+            for v in it:
+                if not visited[v]:
+                    bond = mol.GetBondBetweenAtoms(u, v)
+                    parent_atom[v] = u
+                    parent_bond[v] = bond.GetIdx()
+                    children[u].append(v)
+                    visited[v] = True
+                    visit_order[v] = order_counter
+                    order_counter += 1
+                    stack.append((v, iter(neighbors[v])))
+                    advanced = True
+                    break
+            if not advanced:
+                stack.pop()
+
+    return visit_order, parent_atom, parent_bond, children, fragment_roots
+
+
+def atom_visit_order(mol: Chem.Mol) -> list[int]:
+    """Return, for each atom index, its 0-based rank in the ascending
+    atom-index DFS traversal that `mol_to_smiles` writes atoms in -- i.e.
+    the position that atom would appear at in the output SMILES, counting
+    across all fragments in the order they are emitted."""
+    return _build_dfs_forest(mol)[0]
+
+
 def mol_to_smiles(mol: Chem.Mol) -> str:
     """Serialize `mol` to SMILES, visiting atoms in ascending atom-index
     order at every branch point (instead of RDKit's canonical or
@@ -145,43 +203,8 @@ def mol_to_smiles(mol: Chem.Mol) -> str:
     for bond in work.GetBonds():
         bond.SetBondDir(Chem.BondDir.NONE)
 
-    neighbors = [sorted(a.GetIdx() for a in atom.GetNeighbors())
-                for atom in work.GetAtoms()]
-
-    visited = [False] * n
-    parent_atom = [-1] * n
-    parent_bond = [-1] * n
-    visit_order = [-1] * n
-    children: list[list[int]] = [[] for _ in range(n)]
-    order_counter = 0
-    fragment_roots = []
-
-    # ---- pass 1: atom-idx-ordered DFS spanning forest ----------------
-    for start in range(n):
-        if visited[start]:
-            continue
-        fragment_roots.append(start)
-        visited[start] = True
-        visit_order[start] = order_counter
-        order_counter += 1
-        stack = [(start, iter(neighbors[start]))]
-        while stack:
-            u, it = stack[-1]
-            advanced = False
-            for v in it:
-                if not visited[v]:
-                    bond = work.GetBondBetweenAtoms(u, v)
-                    parent_atom[v] = u
-                    parent_bond[v] = bond.GetIdx()
-                    children[u].append(v)
-                    visited[v] = True
-                    visit_order[v] = order_counter
-                    order_counter += 1
-                    stack.append((v, iter(neighbors[v])))
-                    advanced = True
-                    break
-            if not advanced:
-                stack.pop()
+    visit_order, parent_atom, parent_bond, children, fragment_roots = (
+        _build_dfs_forest(work))
 
     tree_bonds = {b for b in parent_bond if b >= 0}
     ring_bonds = [bond.GetIdx() for bond in work.GetBonds()
