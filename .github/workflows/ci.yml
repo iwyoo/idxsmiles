@@ -24,4 +24,4 @@ jobs:
         run: pip install rdkit pytest
 
       - name: Run tests
-        run: pytest test_idxsmiles.py
+        run: pytest tests/
